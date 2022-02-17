@@ -4,10 +4,10 @@ import argparse
 import pathlib
 from PIL import Image, ImageOps, ImageFont, ImageDraw
 from PyPDF2 import PdfFileMerger
+from datetime import date
 
 # Todos:
 # - Separieren bei mehreren Aufgaben
-# - IOB Logo Header
 # - Zusammensetzten mehrere PDFs wenn keine Bilder vorhanden sind.
 # - Gemischte Ordner Manuelles Mergen ... (vllt dryrun mit warnings?)
 # - Log schreiben
@@ -21,7 +21,7 @@ from PyPDF2 import PdfFileMerger
 
 class dynexite_parser:
 
-    dpi :int = 200
+    dpi : int = 200
     a4_h : int = 297 # mm
     a4_w : int = 210 #mm
     a4_lr_border : int  = 10 #left right border in mm
@@ -135,7 +135,50 @@ class dynexite_parser:
 
 parser = argparse.ArgumentParser(description='Parse Input Options')
 parser.add_argument('--dynexite-archive', metavar='YXZ', type=pathlib.Path, nargs=1,
-                    help='Absolute or relative path to dynexite archive')
+                    help='Absolute or relative path to dynexite archive',
+                    required=True)
+# parser.add_argument('--after-corr-mode', metavar='true/false', type=bool, nargs=1, 
+#                     const=False, default=False,
+#                     help='Only concats pdfs for same mat no i.e. when seperated for correction via uploadfield no',
+#                     required=False)
+# parser.add_argument('--corr-folder', metavar='YXZ', type=pathlib.Path, nargs=1
+#                     help='Path to corrected pdfs folder',
+#                     required='--after-corr-mode')
+# parser.add_argument('--compress-pdfs', metavar='true/false', type=bool, nargs=1, 
+#                     const=True, default=False,
+#                     help='Additional pdf compression via ghostscript after pdf/image concatination',
+#                     required=False)
+# parser.add_argument('--compress-dpi', metavar='dpival', type=int, nargs=1, 
+#                     const=150, default=150,
+#                     help='DPI Value for compression',
+#                     required=False)
+# parser.add_argument('--seperate-upload-fields', metavar='true/false', type=bool, nargs=1, 
+#                     const=False, default=False,
+#                     help='Multiple PDFs per user per Dynexite uploadfield',
+#                     required=False)
+# parser.add_argument('--make-title-page', metavar='true/false', type=bool, nargs=1, 
+#                     const=False, default=False,
+#                     help='Generate title page with title, date and mat no',
+#                     required=False)
+# parser.add_argument('--title', metavar='TITLE', type=str, nargs=1, 
+#                     const="Klausur", default="Klausur",
+#                     help='Title for title page',
+#                     required=False)
+# parser.add_argument('--exam-date', metavar='DATE', type=str, nargs=1, 
+#                     const=date.today().strftime("%d.%m.%Y"), 
+#                     default=date.today().strftime("%d.%m.%Y"),
+#                     help='Exam date for title page(s) and other information',
+#                     required=False)
+# parser.add_argument('--seperate-upload-fields', metavar='true/false', type=bool, nargs=1, 
+#                     const=False, default=False,
+#                     help='Multiple PDFs per user per Dynexite uploadfield')
+# parser.add_argument('--make-sub-title-pages', metavar='true/false', type=bool, nargs=1, 
+#                     const=False, default=False,
+#                     help='Generate sub title page(s) with title, date, partno (uploadfield) and mat no',
+#                     required=False)
+# parser.add_argument('--parse-mat-nums', metavar='123456, ...', type=int, nargs='N',
+#                     help='List of matrikel numbers to parse',
+#                     required=False)
 
 args = parser.parse_args()
 
