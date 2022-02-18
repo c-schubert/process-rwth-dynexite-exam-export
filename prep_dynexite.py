@@ -3,41 +3,28 @@ import os
 import argparse
 import pathlib
 from PIL import Image, ImageOps, ImageFont, ImageDraw
-from wand.image import Image as wimage
-from wand.color import Color
-from PyPDF2 import PdfFileMerger
+from pdf2image import convert_from_bytes
+from PyPDF2 import PdfFileMerger, PdfFileReader, PdfFileWriter
 from datetime import date
 from dynexite_item import dynexite_item
 import io
-import numpy as np
-
-# Todos:
-# - Separieren bei mehreren Aufgaben
-# - Zusammensetzten mehrere PDFs wenn keine Bilder vorhanden sind.
-# - Gemischte Ordner Manuelles Mergen ... (vllt dryrun mit warnings?)
-# - Log schreiben
-# - typing Image
-# - better print info
-# - input arg für rerun mit liste bestimmer matrk nummern
-# - titelseiten (auch für einzelne aufgaben)
-# - refractor
-# - additional ghostscript compression für finale pdf
-# - mehr cmd argumente um alles zu steuern
 
 class dynexite_parser:
 
     dynexite_folder : Union[str, pathlib.Path] = "" 
-    submission_folder_name : str = "gen_pdf_submissions"
+    submission_folder_name : str = "combined_pdf_submissions"
     
     make_title_page : bool = True
     make_subtitle_pages : bool = True
     split_upload_parts : bool = True
     dryrun : bool  = False
-    exam_name : str = "Dummy Name"
+    exam_name : str = "Dummy Exam"
     exam_date : str = "11.11.1111"
 
     concat_corr_mode : bool = False
     concat_corr_folder  : Union[str, pathlib.Path] = "" 
+
+    parse_mat_no_stack : List[int] = []
 
     ############################################################################
     # pillow settings:
@@ -75,8 +62,8 @@ class dynexite_parser:
     # pillow settings end
     ############################################################################
 
-    def __init__(self, args):
 
+    def __init__(self, args):
         if args.dynexite_archive != pathlib.Path(''):
             self.dynexite_folder = args.dynexite_archive[0]
 
@@ -100,6 +87,11 @@ class dynexite_parser:
                 self.split_upload_parts)
         self.pil_dpi = args.dpi
 
+        if args.parse_mat_nums:
+            for i in args.parse_mat_nums:
+                self.parse_mat_no_stack.append(i)
+
+
 
     def main(self):
         if self.concat_corr_mode:
@@ -110,7 +102,8 @@ class dynexite_parser:
 
     def concat_results_pdfs(self):
         assert(self.concat_corr_folder.exists() and self.concat_corr_folder.is_dir())
-        print("After corr mode (--after-corr-mode yes) enabled. Tyring to concatinate pdfs in folder: " + self.concat_corr_folder.as_posix())
+        print("After corr mode (--after-corr-mode yes) enabled. Tyring to concatinate pdfs in folder: "
+                 + self.concat_corr_folder.as_posix())
         
         concat_dir = self.concat_corr_folder / "pdf_concats"
         if not self.dryrun:
@@ -122,7 +115,7 @@ class dynexite_parser:
  
         for file in self.concat_corr_folder.iterdir():
             if file.is_file() and file.name[:6].isdigit() and file.name.endswith(".pdf"):
-            
+                
                 print("Processing: " + file.name + "...")
                 if i > 0 and mat_no != file.name[:6]:
                     self.py2pdf_merge_list_of_pdfs(mat_no, pdfs_to_merge_stack, concat_dir )
@@ -130,8 +123,12 @@ class dynexite_parser:
                     i = 0
 
                 mat_no = file.name[:6]
+
+                if self.parse_mat_no_stack and int(mat_no) not in self.parse_mat_no_stack:
+                    print("Matrikel number ", mat_no, " skipped!")  
+                    continue;    
+
                 pdfs_to_merge_stack.append(file)
-        
                 i = i+1
                     
         if pdfs_to_merge_stack:
@@ -153,8 +150,11 @@ class dynexite_parser:
                 student_subfolder = child
                 mat_no = student_subfolder.name[:6]
 
+                if self.parse_mat_no_stack and int(mat_no) not in self.parse_mat_no_stack:
+                    print("Matrikel number ", mat_no, " skipped!")  
+                    continue;      
+
                 print("Processing: " + student_subfolder.name + "...")
-                # make temporary path
                 tmppath = student_subfolder / "tmp"
 
                 if not self.dryrun:
@@ -182,7 +182,6 @@ class dynexite_parser:
                             pdfs.append(self.pil_title_page(mat_no, self.exam_name, self.exam_date, tmppath, "Upload field "+ str(di.upload_field_no)))
                             item_upload_no.append(di.upload_field_no)
     
-
                     if student_item.is_file() and student_item.name.endswith((".jpg", ".png", ".jpeg")):
                         output_tmp_pdf_name = student_item.with_suffix(".pdf")
                         output_tmp_pdf_name = output_tmp_pdf_name.name
@@ -195,38 +194,10 @@ class dynexite_parser:
                         item_desc.append("Item")
 
                     if student_item.is_file() and student_item.name.endswith((".pdf")):
-
-                        PDFfile = wimage(filename = student_item, resolution = 300)
-                        i = 0
-                        print("\tConverting "+str(len(PDFfile.sequence)) + " pages of PDF " + student_item.name + " to imgPDF: ")
-                        for (img_id, img) in enumerate(PDFfile.sequence):
-                            wimg = wimage(image = img)
-                            wimg.background_color = Color("white")
-                            wimg.alpha_channel = False
-                            blob = wimg.make_blob(format="jpg")
-                            img_buffer = np.asarray(bytearray(blob), dtype='uint8')
-                            bytesio = io.BytesIO(img_buffer)
-                            pil_img = Image.open(bytesio)
-                            pil_im_scaled = self.pil_image_scale(pil_img)
-                            pil_a4im = Image.new('RGB',(self.pil_a4_w_px, self.pil_a4_h_px), 
-                                    self.pil_page_bg_col) 
-
-                            pil_a4im.paste(pil_im_scaled, box=(self.pil_a4_lr_border_px, self.pil_a4_t_border_px))
-                            pil_draw = ImageDraw.Draw(pil_a4im)
-                            
-                            # draw.text((x, y),"Sample Text",(r,g,b))
-                            pil_draw.text((10, 10), "from: " +str(student_item.name) + " Page: "  + str(img_id+1), self.pil_font_col1, font=self.pil_font_def)
-
-                            output_tmp_im_pdf = tmppath / (student_item.with_suffix("").name + "_" + str(img_id) + ".pdf")
-                            pil_a4im.save(output_tmp_im_pdf, 'PDF', quality=self.pil_quality)
-
-                            pdfs.append(output_tmp_im_pdf)
-                            item_upload_no.append(di.upload_field_no)
-                            item_desc.append("Item")
-
-                            print("\t\t" + str(img_id+1) + ". Writing: .../tmp/",output_tmp_im_pdf.name)
-                            i+=1
-
+                        pdf_im_pdfs = self.pdf_2_img_pdfs(student_item , tmppath)
+                        pdfs.extend(pdf_im_pdfs)
+                        item_upload_no.extend([di.upload_field_no] * len(pdf_im_pdfs))
+                        item_desc.extend(["Item"] * len(pdf_im_pdfs))
 
                 if pdfs and not self.split_upload_parts:
                     self.py2pdf_merge_list_of_pdfs(mat_no, pdfs, gen_submissions_folder)
@@ -260,6 +231,45 @@ class dynexite_parser:
             return False
         else:
             return defval
+
+
+    def pdf_2_img_pdfs(self, pdf_file : Union[str, pathlib.Path], output_path : Union[str, pathlib.Path]):
+        pdf_to_pdf_im_files = []
+        pdf = PdfFileReader(open(pdf_file,'rb'), strict=False)
+        pdf_pages = pdf.getNumPages()
+
+        print("\tConverting "+str(pdf_pages) + " pages of PDF " + pdf_file.name + " to imgPDF: ")
+
+        for i in range(0, pdf_pages):
+            output_tmp_im_pdf = output_path / (pdf_file.with_suffix("").name + "_" + str(i) + ".pdf")
+
+            if not self.dryrun:
+                wrt = PdfFileWriter()
+                wrt.addPage( pdf.getPage(i))
+                r = io.BytesIO()
+                wrt.write(r)
+
+                pil_imgs = convert_from_bytes(r.getvalue())
+                r.close()
+                wrt = []
+
+                pil_img = pil_imgs[0]
+
+                pil_im_scaled = self.pil_image_scale(pil_img)
+                pil_a4im = Image.new('RGB',(self.pil_a4_w_px, self.pil_a4_h_px), 
+                        self.pil_page_bg_col) 
+
+                pil_a4im.paste(pil_im_scaled, box=(self.pil_a4_lr_border_px, self.pil_a4_t_border_px))
+                pil_draw = ImageDraw.Draw(pil_a4im)
+                pil_draw.text((10, 10), "from: " +str(pdf_file.name) + " Page: "  + str(i+1), self.pil_font_col1, font=self.pil_font_def)
+
+                pil_a4im.save(output_tmp_im_pdf, 'PDF', quality=self.pil_quality)
+
+            pdf_to_pdf_im_files.append(output_tmp_im_pdf)
+            print("\t\t" + str(i+1) + ". Writing: .../tmp/",output_tmp_im_pdf.name)
+
+        return pdf_to_pdf_im_files
+
 
     def pil_image_to_pdf(self, image_file : Union[str, pathlib.Path], 
             output_pdf : Union[str, pathlib.Path]):
@@ -303,6 +313,7 @@ class dynexite_parser:
         print("\tGenerated pdf concat summary: .../tmp/" + output_im_pdf.name)
         return output_im_pdf
 
+
     def pil_title_page(self, mat_no : str, title : str, date : str,
         output_path : Union[str, pathlib.Path], subtitle : str = ""):
 
@@ -330,6 +341,7 @@ class dynexite_parser:
         
         print("\tGenerated pdf titlepage: .../tmp/" + output_im_pdf.name)
         return output_im_pdf
+
 
     def pil_image_scale(self, im):
         im_w = im.size[0]
@@ -406,7 +418,6 @@ class dynexite_parser:
             return pil_im
 
 
-
 parser = argparse.ArgumentParser(description='Parse Input Options')
 parser.add_argument('--dynexite-archive', metavar='YXZ', type=pathlib.Path, nargs=1,
                     default=pathlib.Path(''),
@@ -416,20 +427,20 @@ parser.add_argument('--dryrun', metavar='true/false', type=str, nargs=1, default
                     help='Perform dryrun',
                     required=False)
 parser.add_argument('--after-corr-mode', type=str, nargs=1, default="No", 
-                    help='Only concats pdfs for same mat no i.e. when seperated for correction via uploadfield no',
+                    help='Only concats pdfs for same matrikel number i.e. when seperated for correction via uploadfield no',
                     required=False)
 parser.add_argument('--corr-folder', metavar='YXZ', type=pathlib.Path, nargs=1, 
                     default=pathlib.Path(''),
                     help='Path to corrected pdfs folder',
                     required=False)
 parser.add_argument('--dpi', metavar='dpival', type=int, nargs=1, default=150,
-                    help='DPI Value for compression',
+                    help='DPI value for compression',
                     required=False)
 parser.add_argument('--seperate-upload-fields', metavar='true/false', type=str, nargs=1, default="No",
                     help='Multiple PDFs per user per Dynexite uploadfield',
                     required=False)
 parser.add_argument('--make-title-page', metavar='true/false', type=str, nargs=1, default="No",
-                    help='Generate title page with title, date and mat no',
+                    help='Generate title page with title, date and matrikel number',
                     required=False)
 parser.add_argument('--exam-title', metavar='TITLE', type=str, nargs=1, default="PA Dummy",
                     help='Title for title page',
@@ -439,13 +450,14 @@ parser.add_argument('--exam-date', metavar='DATE', type=str, nargs=1,
                     help='Exam date for title page(s) and other information',
                     required=False)
 parser.add_argument('--make-sub-title-pages', metavar='true/false', type=str, nargs=1, default="No",
-                    help='Generate sub title page(s) with title, date, partno (uploadfield) and mat no',
+                    help='Generate sub title page(s) with title, date, partno (uploadfield) and matrikel numbers',
                     required=False)
-# parser.add_argument('--parse-mat-nums', metavar='123456, ...', type=int, nargs='N',
-#                     help='List of matrikel numbers to parse',
-#                     required=False)
+parser.add_argument('--parse-mat-nums', metavar='123456 234567 ...', type=int, nargs='+',
+                    help='Specify a list of matrikel numbers to parse',
+                    required=False)
+
+
 
 args = parser.parse_args()
-
 dyn = dynexite_parser(args)
 dyn.main()
