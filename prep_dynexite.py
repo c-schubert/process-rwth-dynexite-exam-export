@@ -8,6 +8,7 @@ from PyPDF2 import PdfFileMerger, PdfFileReader, PdfFileWriter
 from datetime import date
 from dynexite_item import dynexite_item
 import io
+import sys
 
 class dynexite_parser:
 
@@ -26,6 +27,8 @@ class dynexite_parser:
 
     parse_mat_no_stack : List[int] = []
     exclude_mat_no_stack : List[int] =  []
+
+    img_rotation : int = 0
 
     ############################################################################
     # pillow settings:
@@ -84,7 +87,7 @@ class dynexite_parser:
                 self.make_title_page)
         self.make_subtitle_pages = self.set_bool_from_str_arg(args.make_sub_title_pages[0],
                 self.make_subtitle_pages)
-        self.split_upload_parts = self.set_bool_from_str_arg(args.seperate_upload_fields[0],
+        self.split_upload_parts = self.set_bool_from_str_arg(args.separate_upload_fields[0],
                 self.split_upload_parts)
         self.pil_dpi = args.dpi
 
@@ -95,6 +98,8 @@ class dynexite_parser:
         if args.exclude_mat_nums:
             for i in args.exclude_mat_nums:
                 self.exclude_mat_no_stack.append(i)
+
+        self.img_rotation = int(args.rotate[0])
 
 
     def main(self):
@@ -261,7 +266,7 @@ class dynexite_parser:
 
                 pil_img = pil_imgs[0]
 
-                pil_im_scaled = self.pil_image_scale(pil_img)
+                pil_im_scaled = self.pil_image_scale_rotate(pil_img)
                 pil_a4im = Image.new('RGB',(self.pil_a4_w_px, self.pil_a4_h_px), 
                         self.pil_page_bg_col) 
 
@@ -283,7 +288,7 @@ class dynexite_parser:
         if not self.dryrun:
             pil_im = Image.open(image_file)
             pil_im = self.remove_transparency(pil_im)
-            pil_im_scaled = self.pil_image_scale(pil_im)
+            pil_im_scaled = self.pil_image_scale_rotate(pil_im)
             pil_a4im = Image.new('RGB',(self.pil_a4_w_px, self.pil_a4_h_px), 
                     self.pil_page_bg_col) 
 
@@ -348,10 +353,14 @@ class dynexite_parser:
         print("\tGenerated pdf titlepage: .../tmp/" + output_im_pdf.name)
         return output_im_pdf
 
-
-    def pil_image_scale(self, im):
+    def pil_image_scale_rotate(self, im):
         im_w = im.size[0]
         im_h = im.size[1]
+
+        if self.img_rotation != 0:
+            im = im.rotate(self.img_rotation, expand=True,fillcolor=self.pil_page_bg_col)
+            im_w = im.size[0]
+            im_h = im.size[1]
         
         h_scale = self.pil_im_max_h / im_h
         w_scale = self.pil_im_max_w / im_w
@@ -433,7 +442,7 @@ parser.add_argument('--dryrun', metavar='true/false', type=str, nargs=1, default
                     help='Perform dryrun',
                     required=False)
 parser.add_argument('--after-corr-mode', type=str, nargs=1, default="No", 
-                    help='Only concats pdfs for same matrikel number i.e. when seperated for correction via uploadfield no',
+                    help='Only concats pdfs for same matrikel number i.e. when separated for correction via upload field no',
                     required=False)
 parser.add_argument('--corr-folder', metavar='YXZ', type=pathlib.Path, nargs=1, 
                     default=pathlib.Path(''),
@@ -442,8 +451,8 @@ parser.add_argument('--corr-folder', metavar='YXZ', type=pathlib.Path, nargs=1,
 parser.add_argument('--dpi', metavar='dpival', type=int, nargs=1, default=150,
                     help='DPI value for compression',
                     required=False)
-parser.add_argument('--seperate-upload-fields', metavar='true/false', type=str, nargs=1, default="No",
-                    help='Multiple PDFs per user per Dynexite uploadfield',
+parser.add_argument('--separate-upload-fields', metavar='true/false', type=str, nargs=1, default="No",
+                    help='Multiple PDFs per user per Dynexite upload field',
                     required=False)
 parser.add_argument('--make-title-page', metavar='true/false', type=str, nargs=1, default="No",
                     help='Generate title page with title, date and matrikel number',
@@ -464,9 +473,9 @@ parser.add_argument('--parse-mat-nums', metavar='123456 234567 ...', type=int, n
 parser.add_argument('--exclude-mat-nums', metavar='123456 234567 ...', type=int, nargs='+',
                     help='Specify a list of matrikel numbers to exclude from parsing',
                     required=False)
-
-
-
+parser.add_argument('--rotate', metavar='90', type=str, nargs=1, choices=["90", "180", "270"], default="0",
+                    help='Specify a rotation for images/pdfs to parse (90/180/270 only)',
+                    required=False)
 
 args = parser.parse_args()
 dyn = dynexite_parser(args)

@@ -38,27 +38,38 @@ python3 prep_dynexite.py --dynexite-archive "./dynexite/archive-path/..." --make
 ```
 $python3 prep_dynexite.py -h
 
+usage: prep_dynexite.py [-h] [--dynexite-archive YXZ] [--dryrun true/false] [--after-corr-mode AFTER_CORR_MODE]
+                        [--corr-folder YXZ] [--dpi dpival] [--separate-upload-fields true/false]
+                        [--make-title-page true/false] [--exam-title TITLE] [--exam-date DATE]
+                        [--make-sub-title-pages true/false]
+                        [--parse-mat-nums 123456 234567 ... [123456 234567 ... ...]]
+                        [--exclude-mat-nums 123456 234567 ... [123456 234567 ... ...]] [--rotate 90]
+
+Parse Input Options
+
 optional arguments:
   -h, --help            show this help message and exit
   --dynexite-archive YXZ
                         Absolute or relative path to dynexite archive
   --dryrun true/false   Perform dryrun
   --after-corr-mode AFTER_CORR_MODE
-                        Only concats pdfs for same matrikel number i.e. when seperated for
-                        correction via uploadfield no
+                        Only concats pdfs for same matrikel number i.e. when separated for correction via upload field
+                        no
   --corr-folder YXZ     Path to corrected pdfs folder
   --dpi dpival          DPI value for compression
-  --seperate-upload-fields true/false
-                        Multiple PDFs per user per Dynexite uploadfield
+  --separate-upload-fields true/false
+                        Multiple PDFs per user per Dynexite upload field
   --make-title-page true/false
                         Generate title page with title, date and matrikel number
   --exam-title TITLE    Title for title page
   --exam-date DATE      Exam date for title page(s) and other information
   --make-sub-title-pages true/false
-                        Generate sub title page(s) with title, date, partno (uploadfield) and
-                        matrikel numbers
+                        Generate sub title page(s) with title, date, partno (uploadfield) and matrikel numbers
   --parse-mat-nums 123456 234567 ... [123456 234567 ... ...]
                         Specify a list of matrikel numbers to parse
+  --exclude-mat-nums 123456 234567 ... [123456 234567 ... ...]
+                        Specify a list of matrikel numbers to exclude from parsing
+  --rotate 90           Specify a rotation for images/pdfs to parse (90/180/270 only)
 ```
 
 
