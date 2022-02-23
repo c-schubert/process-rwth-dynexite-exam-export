@@ -25,6 +25,7 @@ class dynexite_parser:
     concat_corr_folder  : Union[str, pathlib.Path] = "" 
 
     parse_mat_no_stack : List[int] = []
+    exclude_mat_no_stack : List[int] =  []
 
     ############################################################################
     # pillow settings:
@@ -91,6 +92,9 @@ class dynexite_parser:
             for i in args.parse_mat_nums:
                 self.parse_mat_no_stack.append(i)
 
+        if args.exclude_mat_nums:
+            for i in args.exclude_mat_nums:
+                self.exclude_mat_no_stack.append(i)
 
 
     def main(self):
@@ -124,10 +128,11 @@ class dynexite_parser:
 
                 mat_no = file.name[:6]
 
-                if self.parse_mat_no_stack and int(mat_no) not in self.parse_mat_no_stack:
+                if ((self.parse_mat_no_stack and int(mat_no) not in self.parse_mat_no_stack)
+                    or (self.exclude_mat_no_stack and int(mat_no) in self.exclude_mat_no_stack)):
                     print("Matrikel number ", mat_no, " skipped!")  
-                    continue;    
-
+                    continue
+                
                 pdfs_to_merge_stack.append(file)
                 i = i+1
                     
@@ -136,9 +141,9 @@ class dynexite_parser:
 
 
     def dynexite_concat_pdf_export(self):
-        assert(self.dynexite_folder.exists())
         print("Starting dynexite export to (single) pdf in folder: " 
                 + self.dynexite_folder.as_posix() + "\n")
+        assert(self.dynexite_folder.exists())
 
         gen_submissions_folder = self.dynexite_folder / self.submission_folder_name
         if not self.dryrun:
@@ -150,9 +155,10 @@ class dynexite_parser:
                 student_subfolder = child
                 mat_no = student_subfolder.name[:6]
 
-                if self.parse_mat_no_stack and int(mat_no) not in self.parse_mat_no_stack:
+                if ((self.parse_mat_no_stack and int(mat_no) not in self.parse_mat_no_stack)
+                    or (self.exclude_mat_no_stack and int(mat_no) in self.exclude_mat_no_stack)):
                     print("Matrikel number ", mat_no, " skipped!")  
-                    continue;      
+                    continue   
 
                 print("Processing: " + student_subfolder.name + "...")
                 tmppath = student_subfolder / "tmp"
@@ -345,7 +351,7 @@ class dynexite_parser:
 
     def pil_image_scale(self, im):
         im_w = im.size[0]
-        im_h = im.size[0]
+        im_h = im.size[1]
         
         h_scale = self.pil_im_max_h / im_h
         w_scale = self.pil_im_max_w / im_w
@@ -455,6 +461,10 @@ parser.add_argument('--make-sub-title-pages', metavar='true/false', type=str, na
 parser.add_argument('--parse-mat-nums', metavar='123456 234567 ...', type=int, nargs='+',
                     help='Specify a list of matrikel numbers to parse',
                     required=False)
+parser.add_argument('--exclude-mat-nums', metavar='123456 234567 ...', type=int, nargs='+',
+                    help='Specify a list of matrikel numbers to exclude from parsing',
+                    required=False)
+
 
 
 
