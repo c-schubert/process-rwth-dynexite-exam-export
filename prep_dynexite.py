@@ -434,38 +434,38 @@ class dynexite_parser:
 
 
 parser = argparse.ArgumentParser(description='Parse Input Options')
-parser.add_argument('--dynexite-archive', metavar='YXZ', type=pathlib.Path, nargs=1,
+parser.add_argument('--dynexite-archive', metavar='YXZ', type=pathlib.Path,   nargs=1,
                     default=pathlib.Path(''),
                     help='Absolute or relative path to dynexite archive',
-                    required=False)
+                    required=True)
 parser.add_argument('--dryrun', metavar='true/false', type=str, nargs=1, default="No",
                     help='Perform dryrun',
                     required=False)
 parser.add_argument('--after-corr-mode', type=str, nargs=1, default="No", 
-                    help='Only concats pdfs for same matrikel number i.e. when separated for correction via upload field no',
+                    help='Only concats pdfs for same matrikel number i.e. when separated for correction via upload field no (Default = False)',
                     required=False)
 parser.add_argument('--corr-folder', metavar='YXZ', type=pathlib.Path, nargs=1, 
                     default=pathlib.Path(''),
-                    help='Path to corrected pdfs folder',
+                    help='Path to corrected pdfs folder (Must be defined for after-corr-mode == True)',
                     required=False)
 parser.add_argument('--dpi', metavar='dpival', type=int, nargs=1, default=150,
-                    help='DPI value for compression',
+                    help='DPI value for compression (Default = 150)',
                     required=False)
 parser.add_argument('--separate-upload-fields', metavar='true/false', type=str, nargs=1, default="No",
-                    help='Multiple PDFs per user per Dynexite upload field',
+                    help='Multiple PDFs per user per Dynexite upload field (Default = False)',
                     required=False)
 parser.add_argument('--make-title-page', metavar='true/false', type=str, nargs=1, default="No",
-                    help='Generate title page with title, date and matrikel number',
+                    help='Generate title page with title, date and matrikel number (Default = False)',
                     required=False)
 parser.add_argument('--exam-title', metavar='TITLE', type=str, nargs=1, default="PA Dummy",
-                    help='Title for title page',
+                    help='Title for title page (Default = PA Dummy)',
                     required=False)
 parser.add_argument('--exam-date', metavar='DATE', type=str, nargs=1, 
                     default=date.today().strftime("%d.%m.%Y"),
-                    help='Exam date for title page(s) and other information',
+                    help='Exam date for title page(s) and other information (Default = Today ...)',
                     required=False)
 parser.add_argument('--make-sub-title-pages', metavar='true/false', type=str, nargs=1, default="No",
-                    help='Generate sub title page(s) with title, date, partno (uploadfield) and matrikel numbers',
+                    help='Generate sub title page(s) with title, date, partno (uploadfield) and matrikel numbers (Default = False)',
                     required=False)
 parser.add_argument('--parse-mat-nums', metavar='123456 234567 ...', type=int, nargs='+',
                     help='Specify a list of matrikel numbers to parse',
@@ -474,7 +474,7 @@ parser.add_argument('--exclude-mat-nums', metavar='123456 234567 ...', type=int,
                     help='Specify a list of matrikel numbers to exclude from parsing',
                     required=False)
 parser.add_argument('--rotate', metavar='90', type=str, nargs=1, choices=["90", "180", "270"], default="0",
-                    help='Specify a rotation for images/pdfs to parse (90/180/270 only)',
+                    help='Specify a rotation for images/pdfs to parse (90/180/270 only, Default = 0)',
                     required=False)
 
 args = parser.parse_args()
