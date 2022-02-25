@@ -2,11 +2,13 @@ from typing import Union, List, Set, Dict, Tuple, Optional
 import os
 import argparse
 import pathlib
-from PIL import Image, ImageOps, ImageFont, ImageDraw
+from PIL import Image, ImageOps, ImageFont, ImageDraw, ImageChops
 from pdf2image import convert_from_bytes
 from PyPDF2 import PdfFileMerger, PdfFileReader, PdfFileWriter
 from datetime import date
 from dynexite_item import dynexite_item
+from wand.image import Image as WImage
+from wand.color import Color as WColor
 import io
 import sys
 
@@ -205,7 +207,16 @@ class dynexite_parser:
                         item_desc.append("Item")
 
                     if student_item.is_file() and student_item.name.endswith((".pdf")):
-                        pdf_im_pdfs = self.pdf_2_img_pdfs(student_item , tmppath)
+
+                        try : 
+                            pdf_im_pdfs = self.pdf_pages_to_pil_img_pdf_pdf2img(student_item , tmppath)
+                        except OSError as error :
+                            print(error)
+                            pdf_im_pdfs = self.pdf_pages_to_pil_img_pdf_wand(student_item , tmppath)
+                        except NameError as error:
+                            print(error)
+                            pdf_im_pdfs = self.pdf_pages_to_pil_img_pdf_wand(student_item , tmppath)
+
                         pdfs.extend(pdf_im_pdfs)
                         item_upload_no.extend([di.upload_field_no] * len(pdf_im_pdfs))
                         item_desc.extend(["Item"] * len(pdf_im_pdfs))
@@ -244,42 +255,76 @@ class dynexite_parser:
             return defval
 
 
-    def pdf_2_img_pdfs(self, pdf_file : Union[str, pathlib.Path], output_path : Union[str, pathlib.Path]):
+    def pdf_pages_to_pil_img_pdf_wand(self, pdf_file : Union[str, pathlib.Path], output_path : Union[str, pathlib.Path]):
+        print("\t\t\tTrying wand pdf conversion ...")
+        pdf_to_pdf_im_files = []
+
+        all_pages = WImage(filename=pdf_file, resolution=self.pil_dpi)        
+        # faulty_page = all_pages.sequence[i] 
+        for (i, page) in enumerate(all_pages.sequence):
+            pil_img = None
+            output_tmp_im_pdf = output_path / (pdf_file.with_suffix("").name + "_" + str(i) + ".pdf")
+            with WImage(page) as wimg:
+                wimg.format = 'png'
+                wimg.background_color = WColor('white')
+                wimg.alpha_channel = 'remove'        
+                pil_img = Image.open(io.BytesIO(wimg.make_blob(format="jpeg")))
+
+            self.pil_img_to_pdf(pil_img, pdf_file, i+1,  output_tmp_im_pdf)
+            pdf_to_pdf_im_files.append(output_tmp_im_pdf)
+
+        return pdf_to_pdf_im_files
+
+
+    def pdf_pages_to_pil_img_pdf_pdf2img(self, pdf_file : Union[str, pathlib.Path], output_path : Union[str, pathlib.Path]):
         pdf_to_pdf_im_files = []
         pdf = PdfFileReader(open(pdf_file,'rb'), strict=False)
         pdf_pages = pdf.getNumPages()
 
-        print("\tConverting "+str(pdf_pages) + " pages of PDF " + pdf_file.name + " to imgPDF: ")
+        print("\tConverting "+ str(pdf_pages) + " pages of PDF " + pdf_file.name + " to imgPDF: ")
 
         for i in range(0, pdf_pages):
             output_tmp_im_pdf = output_path / (pdf_file.with_suffix("").name + "_" + str(i) + ".pdf")
-
             if not self.dryrun:
                 wrt = PdfFileWriter()
-                wrt.addPage( pdf.getPage(i))
+                pageobj = pdf.getPage(i)
+       
+                wrt.addPage( pageobj )
                 r = io.BytesIO()
                 wrt.write(r)
+                wrt = None
 
-                pil_imgs = convert_from_bytes(r.getvalue())
+                pil_imgs = convert_from_bytes(r.getvalue(),strict=False,transparent=False,dpi=self.pil_dpi,fmt="jpeg")
                 r.close()
-                wrt = []
 
                 pil_img = pil_imgs[0]
 
-                pil_im_scaled = self.pil_image_scale_rotate(pil_img)
-                pil_a4im = Image.new('RGB',(self.pil_a4_w_px, self.pil_a4_h_px), 
-                        self.pil_page_bg_col) 
-
-                pil_a4im.paste(pil_im_scaled, box=(self.pil_a4_lr_border_px, self.pil_a4_t_border_px))
-                pil_draw = ImageDraw.Draw(pil_a4im)
-                pil_draw.text((10, 10), "from: " +str(pdf_file.name) + " Page: "  + str(i+1), self.pil_font_col1, font=self.pil_font_def)
-
-                pil_a4im.save(output_tmp_im_pdf, 'PDF', quality=self.pil_quality)
+                if pil_img.convert("L").getextrema()[0] == pil_img.convert("L").getextrema()[1]:
+                    raise NameError("\t\t\tWarning: blank pdf page using pdf2images and PyPDF2")
+                    return
+    
+                self.pil_img_to_pdf(pil_img, pdf_file, i+1, output_tmp_im_pdf)
 
             pdf_to_pdf_im_files.append(output_tmp_im_pdf)
-            print("\t\t" + str(i+1) + ". Writing: .../tmp/",output_tmp_im_pdf.name)
 
         return pdf_to_pdf_im_files
+
+    def pil_img_to_pdf(self, pil_img, pdf_file : Union[str, pathlib.Path], pdf_page_no : int, output_tmp_im_pdf : Union[str, pathlib.Path]):
+        pil_img = self.remove_transparency(pil_img)
+        if (pil_img.convert("L").getextrema()[0] == pil_img.convert("L").getextrema()[1]):
+            print("\t\t\tWarning: blank pdf page, possible error in resulting PDF!")
+        
+        pil_im_scaled = self.pil_image_scale_rotate(pil_img)
+        pil_a4im = Image.new('RGB',(self.pil_a4_w_px, self.pil_a4_h_px), 
+                self.pil_page_bg_col) 
+        
+        pil_a4im.paste(pil_im_scaled, box=(self.pil_a4_lr_border_px, self.pil_a4_t_border_px))
+        pil_draw = ImageDraw.Draw(pil_a4im)
+        pil_draw.text((10, 10), "from: " + str(pdf_file.name) + " Page: "  + str(pdf_page_no), self.pil_font_col1, font=self.pil_font_def)
+
+        pil_a4im.save(output_tmp_im_pdf, 'PDF', quality=self.pil_quality)
+        print("\t\t" + str(pdf_page_no) + ". Writing: .../tmp/",output_tmp_im_pdf.name)
+
 
 
     def pil_image_to_pdf(self, image_file : Union[str, pathlib.Path], 
@@ -441,14 +486,14 @@ parser.add_argument('--dynexite-archive', metavar='YXZ', type=pathlib.Path,   na
 parser.add_argument('--dryrun', metavar='true/false', type=str, nargs=1, default="No",
                     help='Perform dryrun',
                     required=False)
-parser.add_argument('--after-corr-mode', type=str, nargs=1, default="No", 
+parser.add_argument('--after-corr-mode', type=str, nargs=1, default="No", metavar='true/false',
                     help='Only concats pdfs for same matrikel number i.e. when separated for correction via upload field no (Default = False)',
                     required=False)
 parser.add_argument('--corr-folder', metavar='YXZ', type=pathlib.Path, nargs=1, 
                     default=pathlib.Path(''),
                     help='Path to corrected pdfs folder (Must be defined for after-corr-mode == True)',
                     required=False)
-parser.add_argument('--dpi', metavar='dpival', type=int, nargs=1, default=150,
+parser.add_argument('--dpi', metavar='dpi-value', type=int, nargs=1, default=150,
                     help='DPI value for compression (Default = 150)',
                     required=False)
 parser.add_argument('--separate-upload-fields', metavar='true/false', type=str, nargs=1, default="No",

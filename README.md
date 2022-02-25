@@ -6,7 +6,7 @@ Changes in export folder structure may break this.
 # Deps
 
 Disclaimer:
-> Only tested on Ubuntu 20.04 (Linux)
+> Tested with Ubuntu 20.04 (Linux/WSL)
 
 ## Third party deps
 
@@ -14,15 +14,33 @@ Disclaimer:
 - Pip
 - Poppler Utils
 - Ghoscript
+- ImageMagick
+- (Python3-venc)
 
-Install dependencies with (command may vary on other Linux distributions)
+# Install deps
+
+0. Use recent Version of Ubuntu i.e. with WSL on Windows
+
+1. Install dependencies with (command may vary on other Linux distributions)
 ```shell
 sudo apt install python3-pip
 sudo apt install poppler-utils
 sudo apt install ghostscript
+sudo apt install libmagickwand-dev
+sudo apt install python3-venv
 ```
 
-Install python packages from project folder with:
+2. (if necessary) Fix potential Imagemagick bug:
+
+Replace line `<policy domain="coder" rights="none" pattern="PDF"/>` in file `/etc/ImageMagick-6/policy.xml` by `<policy domain="coder" rights="read|write" pattern="PDF" />`
+
+
+3. (optional) Switch to project folder and make virtual environment:
+```shell
+python3 -m venv "env"
+```
+
+4. Install python packages from project folder with:
 ```shell
 pip install -r requirements.txt
 ```
