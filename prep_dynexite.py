@@ -479,10 +479,12 @@ class dynexite_parser:
 
 
 parser = argparse.ArgumentParser(description='Parse Input Options')
-parser.add_argument('--dynexite-archive', metavar='YXZ', type=pathlib.Path,   nargs=1,
+parser.add_argument('--dynexite-archive', metavar='YXZ', 
+                    type=pathlib.Path,   nargs=1,
                     default=pathlib.Path(''),
                     help='Absolute or relative path to dynexite archive',
-                    required=True)
+                    required=False)
+                    
 parser.add_argument('--dryrun', metavar='true/false', type=str, nargs=1, default="No",
                     help='Perform dryrun',
                     required=False)
